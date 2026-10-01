@@ -244,8 +244,9 @@ A full leaf's value form is embedded if the value is at most 32 octets long, and
 
 There is one exception. A leaf whose key is neither a listed key nor within a range is in the proof
 only because a listed key's path ends at it, or because a key within a range starts with the path to
-it while its own key lies outside every range; its value was not asked for, so such a leaf uses the
-hash-only form and ships the value's hash instead.
+it while its own key lies outside every range. Its value was not asked for, so when that value is
+longer than 32 octets the leaf uses the hash-only form and ships the value's hash instead; an
+embedded value is shipped as it is, since the leaf node contains it.
 
 The charged keys of a query are its listed keys and the keys of the state that lie within its
 ranges. Since the listed keys are sorted, the ranges are sorted and disjoint, and no listed key lies
@@ -272,7 +273,8 @@ The query cut at a key $k$ is a shorter query derived from the request: it keeps
 that do not exceed $k$, removes every range whose padded `start` exceeds $k$, and ends every
 remaining range whose padded `end` exceeds $k$ at $k$. A truncated reply is not a special form of
 proof: it carries the proof subtree of the query cut at `"proven_through"`, and the client verifies
-it as such. Elision in that proof is decided against the request as sent, not the cut query.
+it as such. Whether a leaf's key counts as listed or within a range follows the cut query; only the
+shared-prefix condition on eligibility counts the listed keys of the request as sent.
 
 A client receiving a truncated reply must verify it against the query cut at `"proven_through"`, and
 may continue with the remaining listed keys and the ranges cut to start after it.
