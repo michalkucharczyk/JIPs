@@ -21,6 +21,11 @@ The proof format is independent of its transport and may be used by any protocol
 
 ## Proof subtree
 
+Throughout this document two terms are used:
+
+- The path to a node is the sequence of bits walked from the root to reach it.
+- The node's depth is the length of that path.
+
 A proof subtree is built from a set of trie nodes, called expanded nodes, that contains the root
 and, for every other node, its parent. It consists of those nodes and both children of each expanded
 branch. Each node is represented as one of:
@@ -34,15 +39,14 @@ A proof subtree proves:
 
 - for every `L` it contains, the leaf's key and entry, where the entry is either a value or a value
   hash;
-- the absence of every key whose path ends at an `E` or at an `L` holding a different key.
+- the absence of every key whose path:
+  - reaches an `E` at any depth, or
+  - ends at an `L` holding a different key.
 
 It proves nothing about a key whose path reaches an `H`. Two degenerate subtrees exist: a single `E`
 for an empty state, and a single `H` carrying the state root when nothing is expanded.
 
 Which nodes a server expands for a given request is defined under [Queries](#queries).
-
-Throughout, the path to a node is the sequence of bits walked from the root to reach it, and the
-node's depth is the length of that path.
 
 ## Encoding
 
