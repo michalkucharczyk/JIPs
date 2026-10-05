@@ -51,7 +51,7 @@ Which nodes a server expands for a given request is defined under [Queries](#que
 ## Encoding
 
 The decoded data of a State Proof consists of a version octet followed by five sections, with no
-lengths:
+explicit section lengths:
 
 ```
 proof   = version tags kinds hashes keys values
