@@ -62,7 +62,7 @@ kinds   = one 2-bit kind per L, in tag order, then zero bits up to the next octe
 hashes  = 32 octets per H and per ValueHash leaf, in tag order
 keys    = key suffix bits per leaf whose kind ships a key, in tag order,
           then zero bits up to the next octet boundary
-values  = len, then the value, per leaf whose kind ships a value, in tag order
+values  = value's len, then the value, per leaf whose kind ships a value, in tag order
 ```
 
 The `version` octet identifies the encoding defined here, version 0; later revisions of this
@@ -182,8 +182,8 @@ and its identity equals the state root:
 The pseudo-code omits the other canonical-form rules, which are checked as each tag, leaf and branch
 is read or completed. To read a leaf, the verifier takes the next kind and then, by kind:
 
-- `Full`: the key is the path followed by the next $248 - d$ bits of the `keys` section, $d$ being the
-  length of the path; the entry is the next `len` and value from the `values` section;
+- `Full`: the key is the path followed by the next $248 - d$ bits of the `keys` section, $d$ being
+  the length of the path; the entry is the next `len` and value from the `values` section;
 - `ValueHash`: the key as for `Full`; the entry is the next hash from the `hashes` section;
 - `KeyElided`: the key is the single known key starting with the path; the entry as for `Full`, and
   any known value is ignored;
@@ -303,5 +303,57 @@ keys `000`, `100`, `110` and `111`, and of the subtrees under the prefixes `0` (
     subtree 00   41dd8fddabce96f7a9e0b737297a41b55924bb4e5e7c7e2f0772ef948a60debd
     subtree 11   4edb3501f7717e134d548ba9825c4e98a8fe174ec15b2d51667d3688dca3f7e9
 
-The proofs for this state are being regenerated for the 2-bit kinds and length-prefixed values of
-this revision and will be listed here.
+Each proof is shown in hex, with its version octet, tags, kinds, hashes, keys and values separated
+by `|`.
+
+- Key `110`, known mode `none`:
+
+      0011340050918ec4ad4465ee3baa8a272129bd2534ad911f63d22abff4716baa78bc97c36b177808b75d08e8e68fc330d42ebdda1eadbd804db18d1e4679cbcb349c52df883a0c1f05cbac875dae2e53c5c15dfad106d7272bf3cb07015aae7e8656f7f9d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d00976616c756520313130
+
+  `00` | `1134` = `B H B H B L H` and 2 padding bits | `00` = Full and 6 padding bits | subtree 0,
+  leaf 100, leaf 111 | key `110` at depth 3: 245 bits and 3 padding bits = 31 octets | `09` `value
+  110`
+
+- Keys `001` and `111`, known mode `none`:
+
+      0001e11c0040f3854ff47a42a159d21e8275e15df4937d19063426e38cfdc30878dbc22ea66b177808b75d08e8e68fc330d42ebdda1eadbd804db18d1e4679cbcb349c52df2af306b851cf153d7c58cf43682fed3b75f2cdd7dfc9a547dcfe990ccaea77abd2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d6969696969696969696969696969696969696969696969696969696969696800976616c7565203030310976616c756520313131
+
+  `00` | `01e11c` = `B B B H L E B H B H L` and 2 padding bits | `00` = Full, Full and 4 padding
+  bits | leaf 000, leaf 100, leaf 110 | keys `001` and `111` at depth 3: 245 + 245 bits and 6
+  padding bits = 62 octets | `09` `value 001`, `09` `value 111`
+
+- Keys `001` and `111`, known mode `keys`, verified with known keys `001` and `111`:
+
+      0001e11ca040f3854ff47a42a159d21e8275e15df4937d19063426e38cfdc30878dbc22ea66b177808b75d08e8e68fc330d42ebdda1eadbd804db18d1e4679cbcb349c52df2af306b851cf153d7c58cf43682fed3b75f2cdd7dfc9a547dcfe990ccaea77ab0976616c7565203030310976616c756520313131
+
+  `00` | `01e11c` as above | `a0` = KeyElided, KeyElided and 4 padding bits | leaf 000, leaf 100,
+  leaf 110 | none | `09` `value 001`, `09` `value 111`
+
+- Range `[001, 110]`, known mode `none`:
+
+      0001e3340040f3854ff47a42a159d21e8275e15df4937d19063426e38cfdc30878dbc22ea6883a0c1f05cbac875dae2e53c5c15dfad106d7272bf3cb07015aae7e8656f7f9d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d34b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a0976616c7565203030310976616c7565203130300976616c756520313130
+
+  `00` | `01e334` = `B B B H L E B L B L H` and 2 padding bits | `00` = Full ×3 and 2 padding bits |
+  leaf 000, leaf 111 | keys `001` (depth 3), `100` (depth 2), `110` (depth 3): 245 + 246 + 245 bits
+  = 92 octets | `09` `value 001`, `09` `value 100`, `09` `value 110`
+
+- Keys `010` and `101`, both absent, known mode `none`:
+
+      0006340041dd8fddabce96f7a9e0b737297a41b55924bb4e5e7c7e2f0772ef948a60debd4edb3501f7717e134d548ba9825c4e98a8fe174ec15b2d51667d3688dca3f7e9696969696969696969696969696969696969696969696969696969696969680976616c756520313030
+
+  `00` | `0634` = `B B H E B L H` and 2 padding bits | `00` = Full and 6 padding bits | subtree 00,
+  subtree 11 | key `100` at depth 2: 246 bits and 2 padding bits = 31 octets; the leaf is shipped
+  because the walk for `101` ends at it | `09` `value 100`
+
+- The empty state, any query:
+
+      0080
+
+  `00` | `80` = `E` and 6 padding bits | none | none | none | none
+
+- A state holding only `110`, key `110`:
+
+      00c000da5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a0976616c756520313130
+
+  `00` | `c0` = `L` and 6 padding bits | `00` = Full and 6 padding bits | none | key `110` at depth
+  0: all 248 bits = 31 octets | `09` `value 110`
