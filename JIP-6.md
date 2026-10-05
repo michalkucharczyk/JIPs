@@ -68,16 +68,20 @@ values  = value data per leaf, as per its kind octet, in tag order
 The `version` octet identifies the encoding defined here, version 0; later revisions of this
 document may define further versions.
 
-The `tags` section lists the nodes of the proof subtree in pre-order: a `B` is followed by the tags
-of its left subtree and then those of its right subtree. This order is called tag order, and the
-other sections follow it.
+The `tags` section lists the nodes of the proof subtree in pre-order traversal: a `B` is followed by
+the tags of its left subtree and then those of its right subtree. This order is called tag order,
+and the other sections follow it.
 
 Each tag is two bits: `B` is `00`, `H` is `01`, `E` is `10` and `L` is `11`. Tags are packed from
 the most significant bits of each octet down, so the first tag occupies bits 7 and 6 of the first
-octet of the `tags` section. The `tags` section ends when the subtree is complete: start with one
-subtree open; every tag closes one, and every `B` opens two more; the section ends when none is
-open. The later sections carry no lengths either: the tags and kinds determine how much each of
-`hashes` and `keys` holds, as described below, and `values` takes the remainder.
+octet of the `tags` section.
+
+The `tags` section ends when the subtree is complete. It starts with one subtree open. Each `H`, `L`
+or `E` tag closes one, while each `B` closes one and opens two more. The section ends when none
+remain open. 
+
+The later sections carry no lengths either: the tags and kinds determine how much each of `hashes`
+and `keys` holds, as described below, and `values` takes the remainder.
 
 The `kinds` section is a sequence of kind octets, one per `L` tag in tag order. A kind octet
 describes one leaf: bit 7 is set for a fully elided leaf and bit 6 for a key-elided leaf, and bits 5
