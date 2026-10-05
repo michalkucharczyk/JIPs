@@ -88,26 +88,27 @@ with zero bits to an octet boundary. The kind says what the proof ships for the 
 
 | Kind | Code | Key | Value |
 |---|---|---|---|
-| Full | `00` | suffix in `keys` | `len` and value in `values` |
-| ValueHash | `01` | suffix in `keys` | hash in `hashes` |
-| KeyElided | `10` | from the client | `len` and value in `values` |
-| FullyElided | `11` | from the client | from the client |
+| `Full` | `00` | suffix in `keys` | `len` and value in `values` |
+| `ValueHash` | `01` | suffix in `keys` | hash in `hashes` |
+| `KeyElided` | `10` | from the client | `len` and value in `values` |
+| `FullyElided` | `11` | from the client | from the client |
 
 `len` is the value's length, encoded as per the GP's variable-length serialization of natural
 numbers, and is less than $2^{32}$. A value of at most 32 octets gives an embedded leaf node, a
-longer one a leaf node with the value's hash, as per the GP. A ValueHash leaf is encoded as a leaf
-node with the given hash in place of the value's hash; when a server uses this kind is defined
-under [Queries](#queries).
+longer one a leaf node with the value's hash, as per the GP. 
 
-The `hashes` section is a sequence of 32-octet entries, one per `H` tag and one per ValueHash leaf,
-in tag order. The entry for an `H` is the identity of the node it stands for. If that node is a left
-child, its identity is encoded as in its parent: with the most significant bit (bit 7 of octet 0)
-cleared. The entry for a ValueHash leaf is the hash of its value, and takes its place in
+A `ValueHash` leaf ships the hash of its value instead of the value itself, and the leaf node is
+rebuilt from that hash.  When a server uses this kind is defined under [Queries](#queries).
+
+The `hashes` section is a sequence of 32-octet entries, one per `H` tag and one per `ValueHash`
+leaf, in tag order. The entry for an `H` is the identity of the node it stands for. If that node is
+a left child, its identity is encoded as in its parent: with the most significant bit (bit 7 of
+octet 0) cleared. The entry for a `ValueHash` leaf is the hash of its value, and takes its place in
 the sequence at the position of the leaf's `L` tag.
 
 The `keys` section holds, for each leaf whose kind ships a key, in tag order, the last $248 - d$
 bits of its key, $d$ being the leaf's depth and the first $d$ bits being the path to it. These
-suffixes are concatenated, most significant bit first, without padding between them; the section is
+suffixes are concatenated, most significant bit first, without padding between them. The section is
 padded with zero bits to an octet boundary at its end only. The leaf's key is the path to it
 followed by its suffix.
 
@@ -181,13 +182,13 @@ and its identity equals the state root:
 The pseudo-code omits the other canonical-form rules, which are checked as each tag, leaf and branch
 is read or completed. To read a leaf, the verifier takes the next kind and then, by kind:
 
-- Full: the key is the path followed by the next $248 - d$ bits of the `keys` section, $d$ being the
+- `Full`: the key is the path followed by the next $248 - d$ bits of the `keys` section, $d$ being the
   length of the path; the entry is the next `len` and value from the `values` section;
-- ValueHash: the key as for Full; the entry is the next hash from the `hashes` section;
-- KeyElided: the key is the single known key starting with the path; the entry as for Full, and any
-  known value is ignored;
-- FullyElided: the key is the single known key starting with the path, and the entry is its
-  known value.
+- `ValueHash`: the key as for `Full`; the entry is the next hash from the `hashes` section;
+- `KeyElided`: the key is the single known key starting with the path; the entry as for `Full`, and
+  any known value is ignored;
+- `FullyElided`: the key is the single known key starting with the path, and the entry is its known
+  value.
 
 The result is the set of present keys with their entries, each either a value or a value hash,
 and the set of covered paths. A key is then:
@@ -237,14 +238,14 @@ is absent from the state, whose walk ends at the leaf of another listed key. Bot
 with that leaf's path, so that leaf is not eligible and stays full. The listed keys meant here are
 those of the request as sent; a key the cut drops is still among the client's known keys.
 
-A leaf's kind follows from its eligibility and the `known` mode. An eligible leaf is Full under
-`none`, KeyElided under `keys` and FullyElided under `keys_and_values`. A leaf that is not
-eligible is Full whatever the mode.
+A leaf's kind follows from its eligibility and the `known` mode. An eligible leaf is `Full` under
+`none`, `KeyElided` under `keys` and `FullyElided` under `keys_and_values`. A leaf that is not
+eligible is `Full` whatever the mode.
 
 There is one exception. A leaf whose key is neither a listed key nor within a range is in the proof
 only because a listed key's path ends at it, or because a key within a range starts with the path to
 it while its own key lies outside every range. Its value was not asked for, so when that value is
-longer than 32 octets the leaf is ValueHash and ships the value's hash instead. A shorter value is
+longer than 32 octets the leaf is `ValueHash` and ships the value's hash instead. A shorter value is
 shipped as it is, since the leaf node contains it.
 
 The charged keys of a query are its listed keys and the keys of the state that lie within its
