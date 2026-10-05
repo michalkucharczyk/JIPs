@@ -58,11 +58,11 @@ proof   = version tags kinds hashes keys values
 version = 0x00
 tags    = subtree, then zero bits up to the next octet boundary
 subtree = B subtree subtree | H | E | L
-kinds   = one kind octet per L, in tag order
-hashes  = 32 octets per H and per hash-only leaf, in tag order
-keys    = key suffix bits per full leaf, in tag order,
+kinds   = one 2-bit kind per L, in tag order, then zero bits up to the next octet boundary
+hashes  = 32 octets per H and per ValueHash leaf, in tag order
+keys    = key suffix bits per leaf whose kind ships a key, in tag order,
           then zero bits up to the next octet boundary
-values  = value data per leaf, as per its kind octet, in tag order
+values  = len, then the value, per leaf whose kind ships a value, in tag order
 ```
 
 The `version` octet identifies the encoding defined here, version 0; later revisions of this
@@ -83,42 +83,36 @@ remain open.
 The later sections carry no lengths either: the tags and kinds determine how much each of `hashes`
 and `keys` holds, as described below, and `values` takes the remainder.
 
-The `kinds` section is a sequence of kind octets, one per `L` tag in tag order. A kind octet
-describes one leaf: bit 7 is set for a fully elided leaf and bit 6 for a key-elided leaf, and bits 5
-to 0 give the value form:
+The `kinds` section holds one 2-bit kind per `L` tag, in tag order, packed like the tags and padded
+with zero bits to an octet boundary. The kind says what the proof ships for the leaf:
 
-| Value form | Bits 5 to 0 | Data in the `values` section |
-|---|---|---|
-| embedded | 0 to 32, the value's length | The value |
-| long | 33 | `len`, then the value; `len` is the value's length |
-| hash-only | 34 | None; the value's hash is in the `hashes` section |
-| invalid | 35 to 63 | |
+| Kind | Code | Key | Value |
+|---|---|---|---|
+| Full | `00` | suffix in `keys` | `len` and value in `values` |
+| ValueHash | `01` | suffix in `keys` | hash in `hashes` |
+| KeyElided | `10` | from the client | `len` and value in `values` |
+| FullyElided | `11` | from the client | from the client |
 
-| Bit 7 | Bit 6 | Kind | Key | Value |
-|---|---|---|---|---|
-| 0 | 0 | Full | Suffix in the `keys` section | As per the value form |
-| 0 | 1 | Key-elided | Supplied by the client | As per the value form |
-| 1 | 0 | Fully elided | Supplied by the client | Supplied by the client; embedded form, 0 |
-| 1 | 1 | Invalid | | |
+`len` is the value's length, encoded as per the GP's variable-length serialization of natural
+numbers, and is less than $2^{32}$. A value of at most 32 octets gives an embedded leaf node, a
+longer one a leaf node with the value's hash, as per the GP. A ValueHash leaf is encoded as a leaf
+node with the given hash in place of the value's hash; when a server uses this kind is defined
+under [Queries](#queries).
 
-`len` is encoded as per the GP's variable-length serialization of natural numbers, and must be
-greater than 32 and less than $2^{32}$. A hash-only leaf is encoded as per the GP as a leaf whose
-value is longer than 32 octets, with the given hash in place of the value's hash; when a server uses
-this form is defined under [Queries](#queries).
-
-The `hashes` section is a sequence of 32-octet entries, one per `H` tag and one per hash-only leaf,
+The `hashes` section is a sequence of 32-octet entries, one per `H` tag and one per ValueHash leaf,
 in tag order. The entry for an `H` is the identity of the node it stands for. If that node is a left
 child, its identity is encoded as in its parent: with the most significant bit (bit 7 of octet 0)
-cleared. The entry for a leaf of the hash-only form is the hash of its value, and takes its place in
+cleared. The entry for a ValueHash leaf is the hash of its value, and takes its place in
 the sequence at the position of the leaf's `L` tag.
 
-The `keys` section holds, for each full leaf in tag order, the last $248 - d$ bits of its key, $d$
-being the leaf's depth and the first $d$ bits being the path to it. These suffixes are concatenated,
-most significant bit first, without padding between them; the section is padded with zero bits to an
-octet boundary at its end only. The leaf's key is the path to it followed by its suffix.
+The `keys` section holds, for each leaf whose kind ships a key, in tag order, the last $248 - d$
+bits of its key, $d$ being the leaf's depth and the first $d$ bits being the path to it. These
+suffixes are concatenated, most significant bit first, without padding between them; the section is
+padded with zero bits to an octet boundary at its end only. The leaf's key is the path to it
+followed by its suffix.
 
-The `values` section holds, for each leaf in tag order, the data its value form announces, and
-nothing else.
+The `values` section holds, for each leaf whose kind ships a value, in tag order, `len` and then the
+value.
 
 ## Canonical form
 
@@ -133,10 +127,9 @@ A verifier must reject a proof if any of the following holds:
    empty child beside an unexpanded sibling.
 6. An `H` carries the zero hash, or an `H` which is a left child has the most significant bit of
    its identity set.
-7. A kind octet has an invalid value form (35 or more), has both bits 7 and 6 set, or has bit 7 set
-   and a non-zero value form.
-8. A long value's `len` is 32 or less, is $2^{32}$ or more, or is not the octets the GP's
-   encoding gives for that number (e.g. `80 28` in place of `28` for 40).
+7. A padding bit of the `kinds` section is set.
+8. A `len` is $2^{32}$ or more, or is not the octets the GP's encoding gives for that number (e.g.
+   `80 28` in place of `28` for 40).
 9. A padding bit of the `keys` section is set.
 10. For a key-elided or fully elided leaf, the client's known keys contain no key, or more than one
     key, starting with the path to the leaf.
@@ -186,14 +179,14 @@ and its identity equals the state root:
             id = identity of the branch with children left and id; tag = B
 
 The pseudo-code omits the other canonical-form rules, which are checked as each tag, leaf and branch
-is read or completed. To read a leaf, the verifier takes the next kind octet and then, by kind:
+is read or completed. To read a leaf, the verifier takes the next kind and then, by kind:
 
-- full: the key is the path followed by the next $248 - d$ bits of the `keys` section, $d$ being the
-  length of the path; the entry is read from the `values` section as the value form says, or is
-  the next hash for the hash-only form;
-- key-elided: the key is the single known key starting with the path; the entry is read as for a
-  full leaf, and any known value is ignored;
-- fully elided: the key is the single known key starting with the path, and the entry is its
+- Full: the key is the path followed by the next $248 - d$ bits of the `keys` section, $d$ being the
+  length of the path; the entry is the next `len` and value from the `values` section;
+- ValueHash: the key as for Full; the entry is the next hash from the `hashes` section;
+- KeyElided: the key is the single known key starting with the path; the entry as for Full, and any
+  known value is ignored;
+- FullyElided: the key is the single known key starting with the path, and the entry is its
   known value.
 
 The result is the set of present keys with their entries, each either a value or a value hash,
@@ -244,17 +237,15 @@ is absent from the state, whose walk ends at the leaf of another listed key. Bot
 with that leaf's path, so that leaf is not eligible and stays full. The listed keys meant here are
 those of the request as sent; a key the cut drops is still among the client's known keys.
 
-A leaf's kind follows from its eligibility and the `known` mode. An eligible leaf is full under
-`none`, key-elided under `keys` and fully elided under `keys_and_values`. A leaf that is not
-eligible is full whatever the mode.
-
-A full leaf's value form is embedded if the value is at most 32 octets long, and otherwise long.
+A leaf's kind follows from its eligibility and the `known` mode. An eligible leaf is Full under
+`none`, KeyElided under `keys` and FullyElided under `keys_and_values`. A leaf that is not
+eligible is Full whatever the mode.
 
 There is one exception. A leaf whose key is neither a listed key nor within a range is in the proof
 only because a listed key's path ends at it, or because a key within a range starts with the path to
 it while its own key lies outside every range. Its value was not asked for, so when that value is
-longer than 32 octets the leaf uses the hash-only form and ships the value's hash instead; an
-embedded value is shipped as it is, since the leaf node contains it.
+longer than 32 octets the leaf is ValueHash and ships the value's hash instead. A shorter value is
+shipped as it is, since the leaf node contains it.
 
 The charged keys of a query are its listed keys and the keys of the state that lie within its
 ranges. Since the listed keys are sorted, the ranges are sorted and disjoint, and no listed key lies
@@ -265,9 +256,9 @@ The charge for a charged key is the size of the leaf at which its lookup ends. F
 key, that leaf holds a different key. A listed key whose lookup ends at an empty subtree is charged
 nothing. A leaf's charged size is:
 
-- 1, for its kind octet;
+- 1, for its kind;
 - $\lceil (248 - d) / 8 \rceil$ if its key suffix is shipped;
-- the length of its data in the `values` section, or 32 for a hash-only leaf.
+- the length of its `len` and value in the `values` section, or 32 for a ValueHash leaf.
 
 The charge is computed per leaf and is deliberately conservative: key suffixes are packed without
 per-leaf padding, so the charged total may exceed the octets the leaves actually add.
@@ -311,56 +302,5 @@ keys `000`, `100`, `110` and `111`, and of the subtrees under the prefixes `0` (
     subtree 00   41dd8fddabce96f7a9e0b737297a41b55924bb4e5e7c7e2f0772ef948a60debd
     subtree 11   4edb3501f7717e134d548ba9825c4e98a8fe174ec15b2d51667d3688dca3f7e9
 
-Each proof is shown in hex, with its version octet, tags, kinds, hashes, keys and values separated
-by `|`.
-
-- Key `110`, known mode `none`:
-
-      0011340950918ec4ad4465ee3baa8a272129bd2534ad911f63d22abff4716baa78bc97c36b177808b75d08e8e68fc330d42ebdda1eadbd804db18d1e4679cbcb349c52df883a0c1f05cbac875dae2e53c5c15dfad106d7272bf3cb07015aae7e8656f7f9d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d076616c756520313130
-
-  `00` | `1134` = `B H B H B L H` and 2 padding bits | `09` = full, embedded, 9 octets |
-  subtree 0, leaf 100, leaf 111 | key `110` at depth 3: 245 bits and 3 padding bits = 31 octets
-  `d2…d0` | `value 110`.
-
-- Keys `001` and `111`, known mode `none`:
-
-      0001e11c090940f3854ff47a42a159d21e8275e15df4937d19063426e38cfdc30878dbc22ea66b177808b75d08e8e68fc330d42ebdda1eadbd804db18d1e4679cbcb349c52df2af306b851cf153d7c58cf43682fed3b75f2cdd7dfc9a547dcfe990ccaea77abd2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d69696969696969696969696969696969696969696969696969696969696968076616c75652030303176616c756520313131
-
-  `00` | `01e11c` = `B B B H L E B H B H L` and 2 padding bits | `0909` = full, embedded, 9
-  octets, twice | leaf 000, leaf 100, leaf 110 | keys `001` and `111` at depth 3: 245 and 245
-  bits and 6 padding bits = 62 octets | `value 001`, `value 111`.
-
-- Keys `001` and `111`, known mode `keys`, verified with known keys `001` and `111`:
-
-      0001e11c494940f3854ff47a42a159d21e8275e15df4937d19063426e38cfdc30878dbc22ea66b177808b75d08e8e68fc330d42ebdda1eadbd804db18d1e4679cbcb349c52df2af306b851cf153d7c58cf43682fed3b75f2cdd7dfc9a547dcfe990ccaea77ab76616c75652030303176616c756520313131
-
-  `00` | `01e11c` as above | `4949` = key-elided, embedded, 9 octets, twice | leaf 000, leaf
-  100, leaf 110 | empty | `value 001`, `value 111`.
-
-- The range whose bounds are keys `001` and `110`, known mode `none`:
-
-      0001e33409090940f3854ff47a42a159d21e8275e15df4937d19063426e38cfdc30878dbc22ea6883a0c1f05cbac875dae2e53c5c15dfad106d7272bf3cb07015aae7e8656f7f9d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d2d34b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b4b5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a76616c75652030303176616c75652031303076616c756520313130
-
-  `00` | `01e334` = `B B B H L E B L B L H` and 2 padding bits | `090909` = full, embedded, 9
-  octets, three times | leaf 000, leaf 111 | keys `001` at depth 3, `100` at depth 2 and `110`
-  at depth 3: 245, 246 and 245 bits, no padding = 92 octets | `value 001`, `value 100`,
-  `value 110`.
-
-- Keys `010` and `101`, neither in the state (octet 0 `0x5A` and `0xBA`, then thirty `0x5A`
-  octets), known mode `none`:
-
-      0006340941dd8fddabce96f7a9e0b737297a41b55924bb4e5e7c7e2f0772ef948a60debd4edb3501f7717e134d548ba9825c4e98a8fe174ec15b2d51667d3688dca3f7e96969696969696969696969696969696969696969696969696969696969696876616c756520313030
-
-  `00` | `0634` = `B B H E B L H` and 2 padding bits | `09` = full, embedded, 9 octets |
-  subtree 00, subtree 11 | key `100` at depth 2: 246 bits and 2 padding bits = 31 octets
-  `69…68` | `value 100`. Key `010` ends at the `E`, and key `101` at the leaf holding key `100`.
-
-- The empty state, any query: `0080` = `00` | `80` = `E` and 6 padding bits.
-
-- The state holding only key `110` with the value `value 110`, whose root is the identity of
-  leaf 110 above; key `110`, known mode `none`:
-
-      00c009da5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a5a76616c756520313130
-
-  `00` | `c0` = `L` and 6 padding bits | `09` = full, embedded, 9 octets | none | key `110` at
-  depth 0: 248 bits = 31 octets | `value 110`.
+The proofs for this state are being regenerated for the 2-bit kinds and length-prefixed values of
+this revision and will be listed here.
