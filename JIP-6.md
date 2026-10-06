@@ -41,43 +41,26 @@ for it:
   function $M$ to those pairs from bit $d$ onwards. The leaf node of a pair is the GP's $L(k, v)$.
   The recursion is at most $248 - d$ levels deep; an implementation may use an explicit stack.
 
-### Queries and entries
+### Queries, entries and claims
 
-A query consists of:
-
-- Listed keys: a strictly ascending sequence of state keys.
-- Ranges: a sequence of pairs `[start, end]` of prefix bounds, each bound 0 to 31 octets long.
-
-A range contains every key from `start` padded to 31 octets with `0x00` up to `end` padded to 31
-octets with `0xFF`, both inclusive. `[p, p]` is thus every key starting with `p`, and
-`[empty, empty]` is every key.
-
-A query must satisfy the following, with bounds compared after padding:
-
-- each range's `start` does not exceed its `end`;
-- each range's `start` exceeds the previous range's `end`;
-- no listed key lies within a range.
-
-An entry is a (key, value) pair of the state. The entries of a query are the pairs of the state
-whose key is a listed key or lies within a range. They are ordered by key, ascending, and each key
-appears once.
+- A query is what a requester asks a prover to prove: a set of listed keys and a set of key
+  ranges. Its exact form and constraints are given under [Proving a query](#proving-a-query).
+- An entry is a (key, value) pair of the state. The verifier's entries are the pairs it received
+  with the proof together with those it already held. Their keys are unique and ascending.
+- The claims of a proof are what the proof, with its entries, proves: that the entries are in the
+  state, that the other keys under its `K` and `R` nodes are absent, and nothing about keys
+  under an `H`. A query names the claims a requester wants.
 
 ### Prover and verifier
 
-The prover holds the state. It answers a query with two things:
+The prover holds the state. It answers a query with two things: the entries of the query, and a
+proof whose claims include those of the query. The proof never carries the key or the value of an
+entry. A listed key that is absent from the state has no entry; its absence follows from the proof.
 
-1. the entries of the query;
-2. the proof defined in this document.
-
-The proof never carries the key or the value of an entry. A listed key that is absent from the
-state has no entry. Its absence follows from the proof.
-
-The verifier holds a trusted state root. It checks the entries against that root with the proof,
-as defined under [Verification](#verification).
-
-This document defines the entries as an input of the verifier, not how they are encoded. A protocol
-carrying the proof may let the prover omit entries that the verifier already holds. The verifier's
-entries are then those it received together with those it held.
+The verifier holds a trusted state root. It checks the entries against that root with the proof, as
+defined under [Verification](#verification). This document defines the entries as an input of the
+verifier, not how they are encoded. A protocol carrying the proof may let the prover omit entries
+that the verifier already holds.
 
 ## Proof subtree
 
@@ -101,39 +84,6 @@ Together with the entries, a proof subtree proves:
 - the absence of every other key that lies under a `K` or an `R`.
 
 It proves nothing about a key that lies under an `H`.
-
-### Construction
-
-The prover gives each node a tag, starting at the root. For a node, the first of the following
-rules that applies gives the tag:
-
-1. If no state key lies under the node, the tag is `K`.
-2. If every state key under the node is the key of an entry, the tag is `K`.
-3. If a listed key lies under the node, or a key within a range lies under the node:
-   - if the node is a leaf, the tag is `R`;
-   - if the node is a branch, the tag is `B`, and the prover applies these rules to both children.
-4. Otherwise, the tag is `H`.
-
-Rule 3 tests keys of the whole key space: a listed key or a key within a range counts whether or
-not it is in the state.
-
-The following consequences hold:
-
-- For an empty state, the proof subtree is a single `K`.
-- For a non-empty state and a query with no listed keys and no ranges, the proof subtree is a
-  single `H` carrying the state root.
-- For a state with one key that is the key of an entry, the proof subtree is a single `K`.
-- For a query of one listed key that is present, the path of the key is a chain of `B` tags that
-  ends at a `K` at its leaf. Each sibling along the path is an `H`, or a `K` if it is empty. Vector
-  1 shows this as `B H B H B K H`.
-- The path of an absent listed key ends at one of:
-  - a `K` that is an empty subtree;
-  - a `K` whose state keys are all keys of entries;
-  - an `R` holding a different key.
-- A subtree whose state keys all lie within ranges is a single `K`, however many keys it holds.
-- A leaf whose key lies outside every range is an `R` when a key within a range lies under it.
-- Two listed keys whose paths end at the same leaf need no special rule. The leaf is a `K` if its
-  key is the key of an entry, and an `R` otherwise.
 
 ## Encoding
 
@@ -303,22 +253,63 @@ value or the hash of its value. A key is then:
 
 A verifier must treat a key that is not covered as a failed proof, never as an absent key.
 
-A verifier that checks a proof against a query it made must also check that:
-
-- no `H` stands for a node under which a listed key lies;
-- no `H` stands for a node under which a key within a range lies;
-- no `R` holds a listed key or a key within a range.
-
-The first check is the lookup of each listed key. The second is needed because the verifier cannot
-look up the keys of a range one by one: such an `H` could hide keys of the range, which would then
-be neither present nor absent. The third is needed because such an `R` would prove a requested key
-without delivering it as an entry, and might ship only the hash of its value.
-
 ## Proving a query
 
-The prover builds the proof subtree of a query with the rules under [Construction](#construction).
-A prover must reject a query that violates the constraints under
-[Queries and entries](#queries-and-entries).
+A query consists of:
+
+- Listed keys: a strictly ascending sequence of state keys.
+- Ranges: a sequence of pairs `[start, end]` of prefix bounds, each bound 0 to 31 octets long.
+
+A range contains every key from `start` padded to 31 octets with `0x00` up to `end` padded to 31
+octets with `0xFF`, both inclusive. `[p, p]` is thus every key starting with `p`, and `[empty,
+empty]` is every key.
+
+A query must satisfy the following, with bounds compared after padding:
+
+- each range's `start` does not exceed its `end`;
+- each range's `start` exceeds the previous range's `end`;
+- no listed key lies within a range.
+
+A prover must reject a query that violates these constraints.
+
+The entries of a query are the pairs of the state whose key is a listed key or lies within a range.
+The prover builds the proof subtree of the query with the rules under [Construction](#construction);
+its claims then include the presence of every entry, the absence of every listed key that is not in
+the state, and the contents of every range.
+
+### Construction
+
+The prover gives each node a tag, starting at the root. For a node, the first of the following
+rules that applies gives the tag:
+
+1. If no state key lies under the node, the tag is `K`.
+2. If every state key under the node is the key of an entry, the tag is `K`.
+3. If a listed key lies under the node, or a key within a range lies under the node:
+   - if the node is a leaf, the tag is `R`;
+   - if the node is a branch, the tag is `B`, and the prover applies these rules to both children.
+4. Otherwise, the tag is `H`.
+
+Rule 3 tests keys of the whole key space: a listed key or a key within a range counts whether or
+not it is in the state.
+
+The following consequences hold:
+
+- For an empty state, the proof subtree is a single `K`.
+- For a non-empty state and a query with no listed keys and no ranges, the proof subtree is a
+  single `H` carrying the state root.
+- For a state with one key that is the key of an entry, the proof subtree is a single `K`.
+- For a query of one listed key that is present, the path of the key is a chain of `B` tags that
+  ends at a `K` at its leaf. Each sibling along the path is an `H`, or a `K` if it is empty. Vector
+  1 shows this as `B H B H B K H`.
+- The path of an absent listed key ends at one of:
+  - a `K` that is an empty subtree;
+  - a `K` whose state keys are all keys of entries;
+  - an `R` holding a different key.
+- A subtree whose state keys all lie within ranges is a single `K`, however many keys it holds.
+- A leaf whose key lies outside every range is an `R` when a key within a range lies under it.
+- Two listed keys whose paths end at the same leaf need no special rule. The leaf is a `K` if its
+  key is the key of an entry, and an `R` otherwise.
+
 
 A protocol may limit the size of a reply. The limit applies to the charged keys of the query, which
 are its listed keys and the keys of the state that lie within its ranges. Since the listed keys are
@@ -357,6 +348,19 @@ key.
 The cut cannot be inferred from the proof. A truncated proof may still cover the whole query,
 because an absent listed key can open the region the cut removed. The completeness and the cut key
 reported by the prover are authoritative.
+
+
+A verifier that checks a proof against a query it made must also check that the claims of the proof
+cover the query:
+
+- no `H` stands for a node under which a listed key lies;
+- no `H` stands for a node under which a key within a range lies;
+- no `R` holds a listed key or a key within a range.
+
+The first check is the lookup of each listed key. The second is needed because the verifier cannot
+look up the keys of a range one by one: such an `H` could hide keys of the range, which would then
+be neither present nor absent. The third is needed because such an `R` would prove a requested key
+without delivering it as an entry, and might ship only the hash of its value.
 
 ## Test vectors
 

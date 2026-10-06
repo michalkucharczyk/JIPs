@@ -213,7 +213,7 @@ Returns a State Proof for the given query in the posterior state of the block wi
 header hash. The query and the proof are as defined in [JIP-6](./JIP-6.md).
 
 The server rejects the request with the JSON-RPC invalid params error if the query violates the
-constraints under [JIP-6](./JIP-6.md#queries-and-entries), if `entries` is not a Boolean, or if
+constraints under [JIP-6](./JIP-6.md#proving-a-query), if `entries` is not a Boolean, or if
 `size_limit` is not a non-negative integer. Servers may clamp `size_limit` to a maximum of their
 choosing and may cap the number of listed keys plus ranges, rejecting a request over that cap with
 the same error. A server may also reject, with the same error, a request whose first charged key
