@@ -26,40 +26,20 @@ The proof format is independent of its transport and may be used by any protocol
 
 ### State trie
 
-- A state key is a sequence of 31 octets, that is, 248 bits. Bits are numbered from the most
-  significant bit of octet 0.
-- The state trie is the binary trie defined by the GP's state Merklization appendix over the state
-  keys. Each node of the trie is one of:
-  - a branch, under which two or more state keys lie;
-  - a leaf, under which exactly one state key lies;
-  - an empty subtree, under which no state key lies.
+The state trie is defined by the GP's state Merklization appendix. This document uses these terms
+for it:
+
 - The path to a node is the sequence of bits walked from the root to reach it: `0` to the left
   child, `1` to the right child. The path to the root is empty.
 - The depth of a node is the length of the path to it.
 - A key lies under a node when the key starts with the path to the node. A key here is any
   sequence of 248 bits, whether or not it is in the state.
-- The hash of a node is the blake2b-256 hash of the node's 64-octet encoding as per the GP. The
-  hash of an empty subtree is the zero hash, 32 zero octets. The GP calls this hash the identity of
-  the (sub-)trie; this document calls it the hash.
-- The encoding of a branch stores the hash of its left child without the most significant bit, bit
-  7 of octet 0, and the hash of its right child in full.
-
-### Rebuilding a subtree
-
-Rebuilding computes the hash of a subtree from all the keys and values under it. Its inputs are a
-depth $d$ and a set of (key, value) pairs whose keys all lie under one node at depth $d$. Its
-result is:
-
-- the zero hash, if the set is empty;
-- the hash of the leaf node of the single pair, if the set has one pair;
-- otherwise, the hash of the branch node whose left child is the rebuild at depth $d + 1$ of the
-  pairs whose key has bit $d$ equal to 0, and whose right child is the rebuild at depth $d + 1$ of
-  the other pairs.
-
-This is the GP's function $M$ applied to the keys from bit $d$ onwards. The leaf node is the GP's
-$L(k, v)$: it embeds a value of at most 32 octets, and holds the hash of a longer value. The
-recursion is at most $248 - d$ levels deep, and an implementation may use an explicit stack
-instead.
+- The hash of a node is the blake2b-256 hash of the node's encoding as per the GP. The hash of an
+  empty subtree is the zero hash. The GP calls this hash the identity of the (sub-)trie; this
+  document calls it the hash.
+- Rebuilding a subtree at depth $d$ from a set of (key, value) pairs means applying the GP's
+  function $M$ to those pairs from bit $d$ onwards. The leaf node of a pair is the GP's $L(k, v)$.
+  The recursion is at most $248 - d$ levels deep; an implementation may use an explicit stack.
 
 ### Queries and entries
 
@@ -195,7 +175,8 @@ The `tags` section ends when the subtree is complete. It starts with one subtree
 remain open.
 
 The `hashes` section holds one 32-octet hash per `H`, in tag order. If the node an `H` stands for
-is a left child, its hash is encoded as in its parent: with bit 7 of octet 0 cleared.
+is a left child, its hash is encoded as the GP's branch encoding stores it: with bit 7 of octet 0
+cleared.
 
 The `raw_keys` section holds, for each `R` in tag order, the last $248 - d$ bits of its key, $d$
 being the depth of the `R`. The first $d$ bits of the key are the path to the `R`, so the key is
