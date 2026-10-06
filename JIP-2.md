@@ -52,7 +52,8 @@ For convenience the following common types are defined:
   data must be exactly 31 bytes in length: a raw state key, as defined by the state Merklization
   appendix of the GP.
 - State Proof: A Blob, containing a compact Merkle proof of part of the state of some block. The
-  decoded data is as defined in [JIP-6](./JIP-6.md).
+  decoded data is the proof as defined in [JIP-6](./JIP-6.md). The requested keys and their values
+  are not part of it; they are returned beside it.
 
 ## Error codes
 
@@ -207,12 +208,12 @@ when the value changes.
 Chain Subscription Update. The `"value"` member is Null when there is no value under the given
 key, otherwise a Blob containing the value.
 
-### `stateProof(header_hash, keys, ranges, known, size_limit)`
+### `stateProof(header_hash, keys, ranges, entries, size_limit)`
 Returns a State Proof for the given query in the posterior state of the block with the given
 header hash. The query and the proof are as defined in [JIP-6](./JIP-6.md).
 
 The server rejects the request with the JSON-RPC invalid params error if the query violates the
-constraints under [JIP-6](./JIP-6.md#queries), if `known` is not one of the Strings below, or if
+constraints under [JIP-6](./JIP-6.md#queries-and-entries), if `entries` is not a Boolean, or if
 `size_limit` is not a non-negative integer. Servers may clamp `size_limit` to a maximum of their
 choosing and may cap the number of listed keys plus ranges, rejecting a request over that cap with
 the same error. A server may also reject, with the same error, a request whose first charged key
@@ -223,16 +224,19 @@ alone would make the reply exceed the server's response size cap.
 2. `keys`: Array of State Keys: The listed keys, strictly ascending.
 3. `ranges`: Array of `[start, end]` Arrays of Blobs: The ranges, ascending. Each bound must
    decode to between 0 and 31 octets; both bounds are inclusive.
-4. `known`: String: The known mode, one of `"none"`, `"keys"` and `"keys_and_values"`.
+4. `entries`: Boolean: True to return the entries of the query, False to omit them for a requester
+   that already holds them. Defaults to True.
 5. `size_limit`: Number: A non-negative integer: soft limit on the total charge of the proof's
-   charged keys, in octets, as defined under [JIP-6](./JIP-6.md#queries). The first charged key is included
+   charged keys, in octets, as defined under [JIP-6](./JIP-6.md#proving-a-query). The first charged key is included
    even if it alone exceeds the limit.
 #### Result
 An Object with the following members:
 - `"proof"`: State Proof.
+- `"entries"`: Array of `[State Key, Blob]` Arrays: The entries of the query, as defined in
+  [JIP-6](./JIP-6.md), each a key and its value, ascending by key. Empty if `entries` is False.
 - `"complete"`: Boolean. False if the size limit cut the query short.
 - `"proven_through"`: State Key. Present only if `"complete"` is False: the last charged key
-  included. The proof is the proof of the query cut at this key.
+  included. The proof and the entries are those of the query cut at this key.
 
 ### `beefyRoot(header_hash)`
 Returns the BEEFY root of the block with the given header hash.
