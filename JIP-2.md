@@ -225,7 +225,7 @@ alone would make the reply exceed the server's response size cap.
 3. `ranges`: Array of `[start, end]` Arrays of Blobs: The ranges, ascending. Each bound must
    decode to between 0 and 31 octets; both bounds are inclusive.
 4. `entries`: Boolean: True to return the entries of the query, False to omit them for a requester
-   that already holds them. Defaults to True.
+   that already holds them.
 5. `size_limit`: Number: A non-negative integer: soft limit on the total charge of the proof's
    charged keys, in octets, as defined under [JIP-6](./JIP-6.md#proving-a-query). The first charged key is included
    even if it alone exceeds the limit.
