@@ -277,8 +277,10 @@ the state, and the contents of every range.
 
 ### Construction
 
-The prover gives each node a tag, starting at the root. For a node, the first of the following
-rules that applies gives the tag:
+The proof subtree follows the paths of the query. The prover starts at the root and opens a
+branch, descending into both children, only when a listed key or a key within a range lies under
+it. Every other node it reaches is closed with a single tag, `K`, `R` or `H`. For a node it
+reaches, the first of the following rules that applies gives the tag:
 
 1. If no state key lies under the node, the tag is `K`.
 2. If every state key under the node is the key of an entry, the tag is `K`.
