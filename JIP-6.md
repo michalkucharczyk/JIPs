@@ -24,8 +24,6 @@ The proof format is independent of its transport and may be used by any protocol
 
 ## Terms
 
-### State trie
-
 The state trie is defined by the GP's state Merklization appendix. This document uses the
 following terms for the state trie:
 
@@ -39,16 +37,12 @@ following terms for the state trie:
   function $M$ to those pairs from bit $d$ onwards. The leaf node of a pair is the GP's $L(k, v)$.
   The recursion is at most $248 - d$ levels deep; an implementation may use an explicit stack.
 
-### Queries, entries and claims
 
+Proof related terms used in this doc are:
 - A _query_ is what a requester asks a prover to prove: a set of listed keys and a set of key
   ranges. Its exact form and constraints are given under [Proving a query](#proving-a-query).
 - An _entry_ is a (key, value) pair of the state. The verifier's entries are the pairs it received
   with the proof together with those it already held. Their keys are unique and ascending.
-- The _claims_ of a proof are what it proves, as given under [Proof subtree](#proof-subtree). A
-  query names the claims a requester wants.
-
-### Prover and verifier
 
 The prover holds the state. It answers a query with two things: the entries of the query, and a
 proof whose claims include those of the query. The proof never carries the key or the value of an
@@ -76,11 +70,12 @@ rebuilding it from the entries under it.
 
 Together with the entries, a proof subtree proves:
 
-- every entry, with its value;
-- for every `R`, its key, with its value or the hash of its value;
-- the absence of every other key that lies under a `K` or an `R`.
+- that every entry is in the state: its key is present and holds its value;
+- that the key of every `R` is present and holds its value, or a value with the shipped hash;
+- that a key under a `K` is absent from the state unless it is the key of an entry;
+- that a key under an `R` is absent from the state unless it is the key of the `R`.
 
-It proves nothing about a key that lies under an `H`.
+It proves nothing about a key under an `H`.
 
 ## Encoding
 
