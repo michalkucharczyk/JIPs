@@ -27,26 +27,32 @@ The proof format is independent of its transport and may be used by any protocol
 The state trie is defined by the GP's state Merklization appendix. This document uses the
 following terms for the state trie:
 
-- The path to a node is the sequence of bits walked from the root to reach it: `0` to the left
-  child, `1` to the right child. The path to the root is empty, and the depth of a node is the
+- The _path to a node_ is the sequence of bits walked from the root to reach it: `0` to the left
+  child, `1` to the right child. The path to the root is empty, and the _depth of a node_ is the
   length of its path.
-- The hash of a node is the blake2b-256 hash of the node's encoding as per the GP. The hash of an
+- The _hash of a node_ is the blake2b-256 hash of the node's encoding as per the GP. The hash of an
   empty subtree is the zero hash. The GP calls this hash the identity of the (sub-)trie; this
   document calls it the hash.
-- Rebuilding a subtree at depth $d$ from a set of (key, value) pairs means applying the GP's
+- A key _lies under_ a node when the path to the node is a prefix of the key, that is, when the key
+  belongs to the subtree rooted at the node. This holds for any key of 248 bits, whether or not it
+  is in the state.
+- _Rebuilding a subtree_ at depth $d$ from a set of (key, value) pairs means applying the GP's
   function $M$ to those pairs from bit $d$ onwards. The leaf node of a pair is the GP's $L(k, v)$.
   The recursion is at most $248 - d$ levels deep; an implementation may use an explicit stack.
 
+This document uses the following terms for proofs:
 
-Proof related terms used in this doc are:
 - A _query_ is what a requester asks a prover to prove: a set of listed keys and a set of key
   ranges. Its exact form and constraints are given under [Proving a query](#proving-a-query).
 - An _entry_ is a (key, value) pair of the state. The verifier's entries are the pairs it received
   with the proof together with those it already held. Their keys are unique and ascending.
+- The _claims_ of a proof are what it proves, as given under [Proof subtree](#proof-subtree). A
+  query names the claims a requester wants.
 
 The prover holds the state. It answers a query with two things: the entries of the query, and a
-proof whose claims include those of the query. The proof never carries the key or the value of an
-entry. A listed key that is absent from the state has no entry; its absence follows from the proof.
+proof that claims at least what the query asks for. The proof never carries the key or the value of
+an entry. A listed key that is absent from the state has no entry; its absence follows from the
+proof.
 
 The verifier holds a trusted state root. It checks the entries against that root with the proof, as
 defined under [Verification](#verification). This document defines the entries as an input of the
@@ -68,12 +74,12 @@ the node's parent. Each node of a proof subtree has one of four tags:
 A `K` under which no state key lies is an empty subtree. The verifier computes the hash of a `K` by
 rebuilding it from the entries under it.
 
-Together with the entries, a proof subtree proves:
+Together with the entries, a proof subtree proves that:
 
-- that every entry is in the state: its key is present and holds its value;
-- that the key of every `R` is present and holds its value, or a value with the shipped hash;
-- that a key under a `K` is absent from the state unless it is the key of an entry;
-- that a key under an `R` is absent from the state unless it is the key of the `R`.
+- every entry is in the state: its key is present and holds its value;
+- the key of every `R` is present and holds its value, or a value with the shipped hash;
+- a key under a `K` is absent from the state unless it is the key of an entry;
+- a key under an `R` is absent from the state unless it is the key of the `R`.
 
 It proves nothing about a key under an `H`.
 
@@ -167,11 +173,11 @@ A verifier must reject a proof of version 0 if any of the following holds:
 12. An entry lies under no `K`.
 13. The hash of the root of the proof subtree differs from the trusted state root.
 
-Rule 4 rejects branches that the construction rules never produce:
+Rule 4 rejects branches that the rules under [Construction](#construction) never produce:
 
-- two `H`: rule 3 of the construction opens a branch for a key that lies under one of its children,
-  and that child is not an `H`;
-- two `K`: rule 2 of the construction makes such a branch a `K` itself;
+- two `H`: construction rule 3 opens a branch for a key that lies under one of its children, and
+  that child is not an `H`;
+- two `K`: construction rule 2 makes such a branch a `K` itself;
 - an empty `K` and an `R`: the state trie has no such branch, because a node with one key under it
   is a leaf.
 
