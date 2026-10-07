@@ -26,14 +26,12 @@ The proof format is independent of its transport and may be used by any protocol
 
 ### State trie
 
-The state trie is defined by the GP's state Merklization appendix. This document uses these terms
-for it:
+The state trie is defined by the GP's state Merklization appendix. This document uses the
+following terms for the state trie:
 
 - The path to a node is the sequence of bits walked from the root to reach it: `0` to the left
-  child, `1` to the right child. The path to the root is empty.
-- The depth of a node is the length of the path to it.
-- A key lies under a node when the key starts with the path to the node. A key here is any
-  sequence of 248 bits, whether or not it is in the state.
+  child, `1` to the right child. The path to the root is empty, and the depth of a node is the
+  length of its path.
 - The hash of a node is the blake2b-256 hash of the node's encoding as per the GP. The hash of an
   empty subtree is the zero hash. The GP calls this hash the identity of the (sub-)trie; this
   document calls it the hash.
@@ -43,13 +41,12 @@ for it:
 
 ### Queries, entries and claims
 
-- A query is what a requester asks a prover to prove: a set of listed keys and a set of key
+- A _query_ is what a requester asks a prover to prove: a set of listed keys and a set of key
   ranges. Its exact form and constraints are given under [Proving a query](#proving-a-query).
-- An entry is a (key, value) pair of the state. The verifier's entries are the pairs it received
+- An _entry_ is a (key, value) pair of the state. The verifier's entries are the pairs it received
   with the proof together with those it already held. Their keys are unique and ascending.
-- The claims of a proof are what the proof, with its entries, proves: that the entries are in the
-  state, that the other keys under its `K` and `R` nodes are absent, and nothing about keys
-  under an `H`. A query names the claims a requester wants.
+- The _claims_ of a proof are what it proves, as given under [Proof subtree](#proof-subtree). A
+  query names the claims a requester wants.
 
 ### Prover and verifier
 
