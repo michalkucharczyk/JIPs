@@ -209,14 +209,14 @@ state root:
         tag = next tag
         match tag:
             B: push an empty slot; append 0 to path; continue
-            H: hash = next hash
+            H: hash = next hash; path is not covered
             K: S = the entries whose keys lie under path
                hash = rebuild of S at depth (length of path)
-               the entries of S are consumed; path is covered
+               the entries of S are consumed
             R: key = path followed by the next 248 - (length of path) bits of raw_keys
                (form, data) = next form octet and its data from raw_values
                hash = hash of the leaf node of key and data
-               key is present; path is covered
+               key is present
         loop:
             if stack is empty:
                 require hash = state root; done
@@ -239,13 +239,17 @@ For an `R`, the leaf node depends on the form octet:
 - form `0` to `32`: the leaf node embeds the data as the value;
 - form `33`: the leaf node holds the data as the hash of the value.
 
-The result of verification is the set of present keys and the set of covered paths. The present
-keys are the keys of the entries, with their values, and the keys of the `R` leaves, each with its
-value or the hash of its value. A key is then:
+The result of verification is the set of present keys and the set of paths of the `H` nodes. The
+present keys are:
+
+- the keys of the entries, with their values, and
+- the keys of the `R` leaves, each with its value or the hash of its value.
+
+A key is then:
 
 - Present, if it is a present key.
-- Absent, if it is not present and a covered path is a prefix of it. Its path in the proof subtree
-  ends at a `K` or at an `R` holding a different key.
+- Absent, if it is not present and its path in the proof subtree ends at a `K` or at an `R` holding
+  a different key.
 - Not covered, otherwise. Its path leaves the proof subtree through an `H`.
 
 A verifier must treat a key that is not covered as a failed proof, never as an absent key.
@@ -276,10 +280,10 @@ the state, and the contents of every range.
 
 ### Construction
 
-The proof subtree follows the paths of the query. Starting at the root, the prover opens a branch
-into both children only when a listed key or a key within a range lies under it. Every other node
-it reaches gets a single tag, `K`, `R` or `H`, and is not opened further. For each node, the first
-of the following rules that applies gives the tag:
+The proof subtree follows only the paths relevant to the query. Starting at the root, the prover
+opens a branch into both children only when a listed key or a key within a range lies under it.
+Every other node it reaches gets a single tag, `K`, `R` or `H`, and is not opened further. For each
+node, the first of the following rules that applies gives the tag:
 
 1. If no state key lies under the node, the tag is `K`.
 2. If every state key under the node is the key of an entry, the tag is `K`.
@@ -300,9 +304,9 @@ The following consequences hold:
 - For a query of one listed key that is present, the path of the key is a chain of `B` tags that
   ends at a `K` at the key's leaf. Each sibling along the path is an `H`, or a `K` if it is empty.
   Vector 1 shows this as `B H B H B K H`.
-- The path of an absent listed key ends at one of:
-  - a `K` that is an empty subtree;
-  - a `K` whose state keys are all keys of entries;
+- The path of a listed key that is absent from the state ends at one of:
+  - an empty `K`;
+  - a non-empty `K`, whose state keys are entries of other listed keys or of ranges;
   - an `R` holding a different key.
 - A subtree whose state keys all lie within ranges is a single `K`, however many keys it holds.
 - A leaf whose key lies outside every range is an `R` when a key within a range lies under it.
