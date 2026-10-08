@@ -7,7 +7,7 @@ proves those entries, and the absence of other keys, against a trusted state roo
 
 A verifier that trusts a block's state root may need to check a small set of state values without
 trusting the prover that provides them. Existing whole-node proofs, such as the CE 129 range proof,
-work well for state synchronisation but are inefficient for a few unrelated keys: they ship
+work well for state synchronisation but are inefficient for a few unrelated keys. They ship
 redundant branch data, repeat common trie paths across requests, and require rebuilding a partial
 trie during verification.
 
@@ -24,8 +24,8 @@ The proof format is independent of its transport and may be used by any protocol
 
 ## Terms
 
-The state trie is defined by the GP's state Merklization appendix. This document uses the
-following terms for the state trie:
+The state trie is defined by the state Merklization appendix of the Gray Paper (GP). This
+document uses the following terms for the state trie:
 
 - The _path to a node_ is the sequence of bits walked from the root to reach it: `0` to the left
   child, `1` to the right child. The path to the root is empty, and the _depth of a node_ is the
@@ -34,20 +34,20 @@ following terms for the state trie:
   empty subtree is the zero hash. The GP calls this hash the identity of the (sub-)trie; this
   document calls it the hash.
 - A key _lies under_ a node when the path to the node is a prefix of the key, that is, when the key
-  belongs to the subtree rooted at the node. This holds for any key of 248 bits, whether or not it
-  is in the state.
+  belongs to the subtree rooted at the node. The term applies to any key of 248 bits, whether or
+  not it is in the state.
 - _Rebuilding a subtree_ at depth $d$ from a set of (key, value) pairs means applying the GP's
   function $M$ to those pairs from bit $d$ onwards. The leaf node of a pair is the GP's $L(k, v)$.
   The recursion is at most $248 - d$ levels deep; an implementation may use an explicit stack.
 
 This document uses the following terms for proofs:
 
-- A _query_ is what a requester asks a prover to prove: a set of listed keys and a set of key
+- A _query_ is what a verifier asks a prover to prove: a set of listed keys and a set of key
   ranges. Its exact form and constraints are given under [Proving a query](#proving-a-query).
 - An _entry_ is a (key, value) pair of the state. The verifier's entries are the pairs it received
   with the proof together with those it already held. Their keys are unique and ascending.
 - The _claims_ of a proof are what it proves, as given under [Proof subtree](#proof-subtree). A
-  query names the claims a requester wants.
+  query names the claims a verifier wants.
 
 The prover holds the state. It answers a query with two things: the entries of the query, and a
 proof that claims at least what the query asks for. The proof never carries the key or the value of
@@ -118,9 +118,8 @@ Each tag is two bits:
 Tags are packed from the most significant bits of each octet down. The first tag thus occupies bits
 7 and 6 of the first octet of the `tags` section.
 
-The `tags` section ends when the subtree is complete. It starts with one subtree open. Each `H`,
-`K` or `R` closes one, while each `B` closes one and opens two more. The section ends when none
-remain open.
+The `tags` section starts with one subtree open. Each `H`, `K` or `R` closes one, while each `B`
+closes one and opens two more. The section ends when none remain open.
 
 The `hashes` section holds one 32-octet hash per `H`, in tag order. If the node an `H` stands for
 is a left child, its hash is encoded as the GP's branch encoding stores it: with bit 7 of octet 0
@@ -175,8 +174,8 @@ A verifier must reject a proof of version 0 if any of the following holds:
 
 Rule 4 rejects branches that the rules under [Construction](#construction) never produce:
 
-- two `H`: construction rule 3 opens a branch for a key that lies under one of its children, and
-  that child is not an `H`;
+- two `H`: construction rule 3 opens a branch only for a key that lies under one of its children,
+  and that child is then not an `H`;
 - two `K`: construction rule 2 makes such a branch a `K` itself;
 - an empty `K` and an `R`: the state trie has no such branch, because a node with one key under it
   is a leaf.
@@ -277,10 +276,10 @@ the state, and the contents of every range.
 
 ### Construction
 
-The proof subtree follows the paths of the query. The prover starts at the root and opens a
-branch, descending into both children, only when a listed key or a key within a range lies under
-it. Every other node it reaches is closed with a single tag, `K`, `R` or `H`. For a node it
-reaches, the first of the following rules that applies gives the tag:
+The proof subtree follows the paths of the query. Starting at the root, the prover opens a branch
+into both children only when a listed key or a key within a range lies under it. Every other node
+it reaches gets a single tag, `K`, `R` or `H`, and is not opened further. For each node, the first
+of the following rules that applies gives the tag:
 
 1. If no state key lies under the node, the tag is `K`.
 2. If every state key under the node is the key of an entry, the tag is `K`.
@@ -299,8 +298,8 @@ The following consequences hold:
   single `H` carrying the state root.
 - For a state with one key that is the key of an entry, the proof subtree is a single `K`.
 - For a query of one listed key that is present, the path of the key is a chain of `B` tags that
-  ends at a `K` at its leaf. Each sibling along the path is an `H`, or a `K` if it is empty. Vector
-  1 shows this as `B H B H B K H`.
+  ends at a `K` at the key's leaf. Each sibling along the path is an `H`, or a `K` if it is empty.
+  Vector 1 shows this as `B H B H B K H`.
 - The path of an absent listed key ends at one of:
   - a `K` that is an empty subtree;
   - a `K` whose state keys are all keys of entries;
@@ -310,6 +309,7 @@ The following consequences hold:
 - Two listed keys whose paths end at the same leaf need no special rule. The leaf is a `K` if its
   key is the key of an entry, and an `R` otherwise.
 
+### Limiting a reply
 
 A protocol may limit the size of a reply. The limit applies to the charged keys of the query, which
 are its listed keys and the keys of the state that lie within its ranges. Since the listed keys are
@@ -332,7 +332,7 @@ first charged key is always included. If a charged key does not fit, the prover 
 reports the last charged key it included, called the cut key. If every charged key fits, the prover
 reports that the reply is complete.
 
-The query cut at a key $k$ is a shorter query derived from the request:
+The query cut at a key $k$ is a shorter query derived from the original:
 
 - it keeps the listed keys that do not exceed $k$;
 - it removes every range whose padded `start` exceeds $k$;
@@ -342,13 +342,14 @@ A truncated reply is not a special form of proof. Its entries and its proof are 
 cut at the cut key. The verifier checks it as the reply to that query. A verifier that holds
 entries of its own must use only those of the cut query.
 
-A verifier may continue with the remaining listed keys and the ranges cut to start after the cut
-key.
+A verifier may continue with a new query made of the listed keys that exceed the cut key and the
+parts of the ranges that lie after it.
 
 The cut cannot be inferred from the proof. A truncated proof may still cover the whole query,
 because an absent listed key can open the region the cut removed. The completeness and the cut key
 reported by the prover are authoritative.
 
+### Checking a reply against the query
 
 A verifier that checks a proof against a query it made must also check that the claims of the proof
 cover the query:
@@ -386,8 +387,7 @@ Subtree `0` is a left child, so its hash appears with bit 7 of octet 0 cleared; 
 starts with `d0`. The other hashes have that bit clear already.
 
 Each proof is shown in hex, followed by its version octet, tags, hashes, raw keys and raw values,
-separated by `|`. The hex is computed from these components and is to be confirmed by an
-implementation.
+separated by `|`. The hex is the concatenation of these components.
 
 1. Listed key `110`. Entries: `110`. Tags `B H B H B K H`. Hashes: subtree 0, leaf 100, leaf 111.
    No raw leaves.
