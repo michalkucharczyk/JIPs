@@ -350,37 +350,33 @@ considers too large.
 
 ### Charged keys
 
-The limit applies to the charged keys of the query: its listed keys and the keys of the state that
-lie within its ranges. Since the listed keys are sorted, the ranges are sorted and disjoint, and no
-listed key lies within a range, the charged keys form one ascending sequence. A range containing
-no key of the state adds no charged keys.
+The prover chooses the cut among the charged keys of the query: its listed keys and the keys of
+the state that lie within its ranges. Since the listed keys are sorted, the ranges are sorted and
+disjoint, and no listed key lies within a range, the charged keys form one ascending sequence. A
+range containing no key of the state adds no charged keys.
 
-The charge of a charged key is the number of octets it adds to the reply:
+### Size of a reply
 
-- a present key: its entry, $31$ plus the length of its value. It is charged whether or not the
-  transport sends the entry, so the cut does not depend on that choice.
-- an absent key whose path ends at an `R`: $\lceil (248 - d) / 8 \rceil + 1$ plus the length of the
-  `R`'s value if it has at most 32 octets, or plus 32 otherwise, $d$ being the depth of the `R`.
-- an absent key whose path ends at a `K`: 0.
-
-The charge is conservative. Key suffixes are packed without per-leaf padding, and two absent listed
-keys whose paths end at the same `R` are each charged for it. Hashes and tags are not charged.
+The size of a reply is the number of octets of its encoded proof plus the octets of its entries,
+$31$ plus the length of the value for each entry. The entries count whether or not the transport
+sends them, so the cut does not depend on that choice.
 
 ### Cutting a reply
-
-The prover includes charged keys in ascending order, starting with the first. It must include the
-first charged key even if its charge alone exceeds the limit. It must not include a further charged
-key if the total charge would then exceed the limit. It may stop earlier.
-
-If the prover includes every charged key, the status is complete. Otherwise the status is cut at
-the last charged key included, called the cut key. With no limit, the prover includes every charged
-key and the status is complete.
 
 The query cut at a key $k$ is a shorter query derived from the original:
 
 - it keeps the listed keys that do not exceed $k$;
 - it removes every range whose padded `start` exceeds $k$;
 - it ends every remaining range whose padded `end` exceeds $k$ at $k$.
+
+The prover must choose a cut key $k$ among the charged keys such that the size of the reply for
+the query cut at $k$ does not exceed the limit. It may choose an earlier charged key than the last
+one for which this holds. It must include the first charged key even if the reply for the query
+cut at it exceeds the limit.
+
+If the cut key is the last charged key, the reply is that of the whole query and the status is
+complete. Otherwise the status is cut at $k$. With no limit, the prover includes every charged key
+and the status is complete.
 
 A cut reply is not a special form of proof. Its entries and its proof are those of the query cut at
 the cut key, and the verifier checks it as the reply to that query. A verifier that holds entries
@@ -392,6 +388,13 @@ status, not from the proof.
 
 A verifier may continue with a new query made of the listed keys that exceed the cut key and the
 parts of the ranges that lie after it.
+
+A prover can find the cut in one walk over the charged keys in ascending order, keeping the size
+of the reply for the query cut at the current key. Moving to the next key adds its entry or raw
+leaf, the tag bits of its path, and a hash for each non-empty sibling below the node where its path
+parts from the previous key's path; it removes the hash of the sibling the key enters. Siblings to
+the right of the current key count as hashes because they are hashes if the cut lands there. The
+prover then builds the proof once, for the cut query.
 
 ## Appendix B: Test vectors
 

@@ -226,9 +226,9 @@ alone would make the reply exceed the server's response size cap.
    decode to between 0 and 31 octets; both bounds are inclusive.
 4. `entries`: Boolean: True to return the entries of the query, False to omit them for a requester
    that already holds them.
-5. `size_limit`: Number: A non-negative integer: soft limit on the total charge of the proof's
-   charged keys, in octets, as defined under [JIP-6](./JIP-6.md#appendix-a-prover-contract). The
-   first charged key is included even if it alone exceeds the limit.
+5. `size_limit`: Number: A non-negative integer: soft limit on the size of the reply, in octets,
+   as defined under [JIP-6](./JIP-6.md#appendix-a-prover-contract). The first charged key is
+   included even if the reply for it alone exceeds the limit.
 #### Result
 An Object with the following members:
 - `"proof"`: State Proof.
