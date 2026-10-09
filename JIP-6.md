@@ -20,7 +20,7 @@ One proof covers multiple keys and ranges, and proves both presence and absence.
 a single pass with a stack. For a range, its size grows with the depth of the trie, not with the
 number of keys in the range.
 
-The proof format is independent of its transport and may be used by any protocol.
+The proof format is independent of the transport that carries it.
 
 ## Terms
 
@@ -56,7 +56,7 @@ proof.
 
 The verifier holds a trusted state root. It checks the entries against that root with the proof, as
 defined under [Verification](#verification). This document defines the entries as an input of the
-verifier, not how they are encoded. A protocol carrying the proof may let the prover omit entries
+verifier, not how they are encoded. A transport carrying the proof may let the prover omit entries
 that the verifier already holds.
 
 ## Proof subtree
@@ -186,7 +186,7 @@ encoded proof subtree whose root hash is the state root.
 The verifier does not check that the proof subtree is the one the construction rules give for a
 query. A proof may therefore open more of the trie than the query needs, which proves more keys,
 never fewer. The checks a verifier makes against its own query are listed under
-[Verification](#verification).
+[Checking a reply against the query](#checking-a-reply-against-the-query).
 
 A verifier may bound the size of the proofs it accepts.
 
@@ -373,7 +373,8 @@ first charged key even if its charge alone exceeds the limit. It must not includ
 key if the total charge would then exceed the limit. It may stop earlier.
 
 If the prover includes every charged key, the status is complete. Otherwise the status is cut at
-the last charged key included, called the cut key.
+the last charged key included, called the cut key. With no limit, the prover includes every charged
+key and the status is complete.
 
 The query cut at a key $k$ is a shorter query derived from the original:
 
@@ -386,8 +387,8 @@ the cut key, and the verifier checks it as the reply to that query. A verifier t
 of its own must use only those of the cut query.
 
 The cut cannot be inferred from the proof. A cut proof may still cover the whole query, because an
-absent listed key can open the region the cut removed. The status reported by the prover is
-authoritative.
+absent listed key can open the region the cut removed. The verifier must take the cut from the
+status, not from the proof.
 
 A verifier may continue with a new query made of the listed keys that exceed the cut key and the
 parts of the ranges that lie after it.
