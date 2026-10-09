@@ -313,46 +313,6 @@ The following consequences hold:
 - Two listed keys whose paths end at the same leaf need no special rule. The leaf is a `K` if its
   key is the key of an entry, and an `R` otherwise.
 
-### Limiting a reply
-
-A protocol may limit the size of a reply. The limit applies to the charged keys of the query, which
-are its listed keys and the keys of the state that lie within its ranges. Since the listed keys are
-sorted, the ranges are sorted and disjoint, and no listed key lies within a range, the charged keys
-form one ascending sequence. A range containing no key of the state adds no charged keys.
-
-The charge of a charged key is the number of octets it adds to the reply:
-
-- a present key: $31$ plus the length of its value, the octets of its entry. This holds whether or
-  not the protocol sends the entry.
-- an absent key whose path ends at an `R`: $\lceil (248 - d) / 8 \rceil + 1$ plus the length of the
-  `R`'s value if it has at most 32 octets, or plus 32 otherwise, $d$ being the depth of the `R`.
-- an absent key whose path ends at a `K`: 0.
-
-The charge is conservative. Key suffixes are packed without per-leaf padding, and two absent listed
-keys whose paths end at the same `R` are each charged for it. Hashes and tags are not charged.
-
-The prover includes charged keys in order while their total charge stays within the limit. The
-first charged key is always included. If a charged key does not fit, the prover stops there and
-reports the last charged key it included, called the cut key. If every charged key fits, the prover
-reports that the reply is complete.
-
-The query cut at a key $k$ is a shorter query derived from the original:
-
-- it keeps the listed keys that do not exceed $k$;
-- it removes every range whose padded `start` exceeds $k$;
-- it ends every remaining range whose padded `end` exceeds $k$ at $k$.
-
-A truncated reply is not a special form of proof. Its entries and its proof are those of the query
-cut at the cut key. The verifier checks it as the reply to that query. A verifier that holds
-entries of its own must use only those of the cut query.
-
-A verifier may continue with a new query made of the listed keys that exceed the cut key and the
-parts of the ranges that lie after it.
-
-The cut cannot be inferred from the proof. A truncated proof may still cover the whole query,
-because an absent listed key can open the region the cut removed. The completeness and the cut key
-reported by the prover are authoritative.
-
 ### Checking a reply against the query
 
 A verifier that checks a proof against a query it made must also check that the claims of the proof
@@ -366,6 +326,68 @@ The first check is the lookup of each listed key. The second is needed because t
 look up the keys of a range one by one: such an `H` could hide keys of the range, which would then
 be neither present nor absent. The third is needed because such an `R` would prove a requested key
 without delivering it as an entry, and might ship only the hash of its value.
+
+## Prover contract
+
+A transport, such as the `stateProof` method of JIP-2 or a CE message, carries queries to a prover
+and replies back. This section defines the exchange independently of the transport, so that every
+transport limits and cuts replies the same way.
+
+The request and the reply have this shape:
+
+    request = query, limit
+    query   = listed keys, ranges       as defined under Proving a query
+    limit   = a number of octets, or none
+    reply   = proof, entries, status
+    status  = complete | cut at a key
+
+A transport maps the request and the reply onto its own messages. It must carry the status. It may
+let the verifier ask for the entries to be omitted, may clamp the limit, and may reject a query it
+considers too large.
+
+### Charged keys
+
+The limit applies to the charged keys of the query: its listed keys and the keys of the state that
+lie within its ranges. Since the listed keys are sorted, the ranges are sorted and disjoint, and no
+listed key lies within a range, the charged keys form one ascending sequence. A range containing
+no key of the state adds no charged keys.
+
+The charge of a charged key is the number of octets it adds to the reply:
+
+- a present key: its entry, $31$ plus the length of its value. It is charged whether or not the
+  transport sends the entry, so the cut does not depend on that choice.
+- an absent key whose path ends at an `R`: $\lceil (248 - d) / 8 \rceil + 1$ plus the length of the
+  `R`'s value if it has at most 32 octets, or plus 32 otherwise, $d$ being the depth of the `R`.
+- an absent key whose path ends at a `K`: 0.
+
+The charge is conservative. Key suffixes are packed without per-leaf padding, and two absent listed
+keys whose paths end at the same `R` are each charged for it. Hashes and tags are not charged.
+
+### Cutting a reply
+
+The prover includes charged keys in ascending order, starting with the first. It must include the
+first charged key even if its charge alone exceeds the limit. It must not include a further charged
+key if the total charge would then exceed the limit. It may stop earlier.
+
+If the prover includes every charged key, the status is complete. Otherwise the status is cut at
+the last charged key included, called the cut key.
+
+The query cut at a key $k$ is a shorter query derived from the original:
+
+- it keeps the listed keys that do not exceed $k$;
+- it removes every range whose padded `start` exceeds $k$;
+- it ends every remaining range whose padded `end` exceeds $k$ at $k$.
+
+A cut reply is not a special form of proof. Its entries and its proof are those of the query cut at
+the cut key, and the verifier checks it as the reply to that query. A verifier that holds entries
+of its own must use only those of the cut query.
+
+The cut cannot be inferred from the proof. A cut proof may still cover the whole query, because an
+absent listed key can open the region the cut removed. The status reported by the prover is
+authoritative.
+
+A verifier may continue with a new query made of the listed keys that exceed the cut key and the
+parts of the ranges that lie after it.
 
 ## Test vectors
 
