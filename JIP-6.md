@@ -389,25 +389,8 @@ status, not from the proof.
 A verifier may continue with a new query made of the listed keys that exceed the cut key and the
 parts of the ranges that lie after it.
 
-A prover can find the cut in one walk, without building a proof for each candidate. It walks the
-charged keys in ascending order and keeps three things: the candidate cut key, the size of the
-reply for the query cut at that key, and the path of that key.
-
-For the next charged key, the prover updates the size in four steps:
-
-1. It finds the node where the key's path parts from the previous key's path.
-2. It removes the hash counted for the sibling it enters at that node, if one was counted.
-3. For each node below, down to the end of the key's path, it adds the tag bits and, if the
-   sibling at that node is not empty, one hash.
-4. It adds the key's entry if the key is present and entries are sent, or the raw leaf if the
-   key's path ends at an `R`.
-
-The siblings to the right of the key count as hashes because they are hashes if the cut lands at
-this key. A later key that enters one of them removes that hash again, in step 2.
-
-If the new size exceeds the limit, the prover stops and the candidate is the cut key. Otherwise the
-key becomes the candidate. After the walk, the prover builds the proof once, for the query cut at
-the cut key.
+A prover can find the cut in one walk over the charged keys, keeping the size of the reply for the
+query cut at the current key, and then build the proof once.
 
 ## Appendix B: Test vectors
 
