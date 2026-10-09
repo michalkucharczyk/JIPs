@@ -327,10 +327,13 @@ look up the keys of a range one by one: such an `H` could hide keys of the range
 be neither present nor absent. The third is needed because such an `R` would prove a requested key
 without delivering it as an entry, and might ship only the hash of its value.
 
-## Prover contract
+## Appendix A: Prover contract
+
+This appendix binds a prover that serves the proof over a transport. A verifier that only checks
+proofs does not need it.
 
 A transport, such as the `stateProof` method of JIP-2 or a CE message, carries queries to a prover
-and replies back. This section defines the exchange independently of the transport, so that every
+and replies back. This appendix defines the exchange independently of the transport, so that every
 transport limits and cuts replies the same way.
 
 The request and the reply have this shape:
@@ -389,7 +392,7 @@ authoritative.
 A verifier may continue with a new query made of the listed keys that exceed the cut key and the
 parts of the ranges that lie after it.
 
-## Test vectors
+## Appendix B: Test vectors
 
 These vectors use a state of five keys, named by their first three bits: `000`, `001`, `100`, `110`
 and `111`. Octet 0 of each key is those three bits followed by `11010`, and octets 1 to 30 are
