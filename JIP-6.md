@@ -329,8 +329,8 @@ without delivering it as an entry, and might ship only the hash of its value.
 
 ## Appendix A: Prover contract
 
-This appendix binds a prover that serves the proof over a transport. A verifier that only checks
-proofs does not need it.
+A prover that serves the proof over a transport must follow this appendix. A verifier that only
+checks proofs does not need it.
 
 A transport, such as the `stateProof` method of JIP-2 or a CE message, carries queries to a prover
 and replies back. This appendix defines the exchange independently of the transport, so that every
