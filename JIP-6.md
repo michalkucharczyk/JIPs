@@ -1,7 +1,7 @@
 # JIP-6: Compact state proofs
 
 A compact Merkle proof for the JAM state trie. Together with a set of state entries, it proves
-those entries, and the absence of other keys, against a trusted state root.
+presence or absence of those entries against a trusted state root.
 
 ## Motivation
 
